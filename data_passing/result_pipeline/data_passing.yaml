@@ -1,0 +1,450 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: data-passing-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-15T16:31:05.554417',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Pipeline that passes small
+      constant string to to consumer", "name": "data passing"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13}
+spec:
+  entrypoint: data-passing
+  templates:
+  - name: data-passing
+    dag:
+      tasks:
+      - {name: one-small-output-int, template: one-small-output-int}
+      - {name: one-small-output-str, template: one-small-output-str}
+      - name: print-small-int
+        template: print-small-int
+        dependencies: [one-small-output-int]
+        arguments:
+          parameters:
+          - {name: one-small-output-int-Output, value: '{{tasks.one-small-output-int.outputs.parameters.one-small-output-int-Output}}'}
+      - name: print-small-text
+        template: print-small-text
+        dependencies: [one-small-output-str]
+        arguments:
+          parameters:
+          - {name: one-small-output-str-Output, value: '{{tasks.one-small-output-str.outputs.parameters.one-small-output-str-Output}}'}
+      - name: print-two-arguments
+        template: print-two-arguments
+        dependencies: [two-small-outputs]
+        arguments:
+          parameters:
+          - {name: two-small-outputs-number, value: '{{tasks.two-small-outputs.outputs.parameters.two-small-outputs-number}}'}
+          - {name: two-small-outputs-text, value: '{{tasks.two-small-outputs.outputs.parameters.two-small-outputs-text}}'}
+      - name: print-two-arguments-2
+        template: print-two-arguments-2
+        dependencies: [one-small-output-int, one-small-output-str]
+        arguments:
+          parameters:
+          - {name: one-small-output-int-Output, value: '{{tasks.one-small-output-int.outputs.parameters.one-small-output-int-Output}}'}
+          - {name: one-small-output-str-Output, value: '{{tasks.one-small-output-str.outputs.parameters.one-small-output-str-Output}}'}
+      - {name: two-small-outputs, template: two-small-outputs}
+  - name: one-small-output-int
+    container:
+      args: ['----output-paths', /tmp/outputs/Output/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def one_small_output_int():
+            return 111
+
+        def _serialize_int(int_value: int) -> str:
+            if isinstance(int_value, str):
+                return int_value
+            if not isinstance(int_value, int):
+                raise TypeError('Value "{}" has type "{}" instead of int.'.format(
+                    str(int_value), str(type(int_value))))
+            return str(int_value)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='One small output int', description='')
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=1)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = one_small_output_int(**_parsed_args)
+
+        _outputs = [_outputs]
+
+        _output_serializers = [
+            _serialize_int,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    outputs:
+      parameters:
+      - name: one-small-output-int-Output
+        valueFrom: {path: /tmp/outputs/Output/data}
+      artifacts:
+      - {name: one-small-output-int-Output, path: /tmp/outputs/Output/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["----output-paths", {"outputPath": "Output"}], "command": ["sh",
+          "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def one_small_output_int():\n    return
+          111\n\ndef _serialize_int(int_value: int) -> str:\n    if isinstance(int_value,
+          str):\n        return int_value\n    if not isinstance(int_value, int):\n        raise
+          TypeError(''Value \"{}\" has type \"{}\" instead of int.''.format(\n            str(int_value),
+          str(type(int_value))))\n    return str(int_value)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''One small output int'', description='''')\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=1)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = one_small_output_int(**_parsed_args)\n\n_outputs
+          = [_outputs]\n\n_output_serializers = [\n    _serialize_int,\n\n]\n\nimport
+          os\nfor idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "name": "One small output int", "outputs": [{"name":
+          "Output", "type": "Integer"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: one-small-output-str
+    container:
+      args: ['----output-paths', /tmp/outputs/Output/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def one_small_output_str():
+            return 'one_output'
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='One small output str', description='')
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=1)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = one_small_output_str(**_parsed_args)
+
+        _outputs = [_outputs]
+
+        _output_serializers = [
+            _serialize_str,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    outputs:
+      parameters:
+      - name: one-small-output-str-Output
+        valueFrom: {path: /tmp/outputs/Output/data}
+      artifacts:
+      - {name: one-small-output-str-Output, path: /tmp/outputs/Output/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["----output-paths", {"outputPath": "Output"}], "command": ["sh",
+          "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def one_small_output_str():\n    return
+          ''one_output''\n\ndef _serialize_str(str_value: str) -> str:\n    if not
+          isinstance(str_value, str):\n        raise TypeError(''Value \"{}\" has
+          type \"{}\" instead of str.''.format(\n            str(str_value), str(type(str_value))))\n    return
+          str_value\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''One
+          small output str'', description='''')\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=1)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = one_small_output_str(**_parsed_args)\n\n_outputs
+          = [_outputs]\n\n_output_serializers = [\n    _serialize_str,\n\n]\n\nimport
+          os\nfor idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "name": "One small output str", "outputs": [{"name":
+          "Output", "type": "String"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: print-small-int
+    container:
+      args: [--text, '{{inputs.parameters.one-small-output-int-Output}}']
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def print_small_int(text):
+            '''Print small text'''
+            print(text)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Print small int', description='Print small text')
+        _parser.add_argument("--text", dest="text", type=int, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = print_small_int(**_parsed_args)
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: one-small-output-int-Output}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Print
+          small text", "implementation": {"container": {"args": ["--text", {"inputValue":
+          "text"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\"
+          \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def
+          print_small_int(text):\n    ''''''Print small text''''''\n    print(text)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Print small int'', description=''Print
+          small text'')\n_parser.add_argument(\"--text\", dest=\"text\", type=int,
+          required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = print_small_int(**_parsed_args)\n"], "image": "python:3.7"}}, "inputs":
+          [{"name": "text", "type": "Integer"}], "name": "Print small int"}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"text": "{{inputs.parameters.one-small-output-int-Output}}"}'}
+  - name: print-small-text
+    container:
+      args: [--text, '{{inputs.parameters.one-small-output-str-Output}}']
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def print_small_text(text):
+            '''Print small text'''
+            print(text)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Print small text', description='Print small text')
+        _parser.add_argument("--text", dest="text", type=str, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = print_small_text(**_parsed_args)
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: one-small-output-str-Output}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Print
+          small text", "implementation": {"container": {"args": ["--text", {"inputValue":
+          "text"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\"
+          \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def
+          print_small_text(text):\n    ''''''Print small text''''''\n    print(text)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Print small text'', description=''Print
+          small text'')\n_parser.add_argument(\"--text\", dest=\"text\", type=str,
+          required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = print_small_text(**_parsed_args)\n"], "image": "python:3.7"}}, "inputs":
+          [{"name": "text", "type": "String"}], "name": "Print small text"}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"text": "{{inputs.parameters.one-small-output-str-Output}}"}'}
+  - name: print-two-arguments
+    container:
+      args: [--text, '{{inputs.parameters.two-small-outputs-text}}', --number, '{{inputs.parameters.two-small-outputs-number}}']
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def print_two_arguments(text, number):
+            print('Text={}'.format(text))
+            print('Number={}'.format(str(number)))
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Print two arguments', description='')
+        _parser.add_argument("--text", dest="text", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--number", dest="number", type=int, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = print_two_arguments(**_parsed_args)
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: two-small-outputs-number}
+      - {name: two-small-outputs-text}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--text", {"inputValue": "text"}, "--number", {"inputValue": "number"}],
+          "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" >
+          \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def print_two_arguments(text,
+          number):\n    print(''Text={}''.format(text))\n    print(''Number={}''.format(str(number)))\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Print two arguments'',
+          description='''')\n_parser.add_argument(\"--text\", dest=\"text\", type=str,
+          required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--number\",
+          dest=\"number\", type=int, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = print_two_arguments(**_parsed_args)\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "text", "type": "String"},
+          {"name": "number", "type": "Integer"}], "name": "Print two arguments"}',
+        pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/arguments.parameters: '{"number":
+          "{{inputs.parameters.two-small-outputs-number}}", "text": "{{inputs.parameters.two-small-outputs-text}}"}'}
+  - name: print-two-arguments-2
+    container:
+      args: [--text, '{{inputs.parameters.one-small-output-str-Output}}', --number,
+        '{{inputs.parameters.one-small-output-int-Output}}']
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def print_two_arguments(text, number):
+            print('Text={}'.format(text))
+            print('Number={}'.format(str(number)))
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Print two arguments', description='')
+        _parser.add_argument("--text", dest="text", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--number", dest="number", type=int, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = print_two_arguments(**_parsed_args)
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: one-small-output-int-Output}
+      - {name: one-small-output-str-Output}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--text", {"inputValue": "text"}, "--number", {"inputValue": "number"}],
+          "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" >
+          \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def print_two_arguments(text,
+          number):\n    print(''Text={}''.format(text))\n    print(''Number={}''.format(str(number)))\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Print two arguments'',
+          description='''')\n_parser.add_argument(\"--text\", dest=\"text\", type=str,
+          required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--number\",
+          dest=\"number\", type=int, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = print_two_arguments(**_parsed_args)\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "text", "type": "String"},
+          {"name": "number", "type": "Integer"}], "name": "Print two arguments"}',
+        pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/arguments.parameters: '{"number":
+          "{{inputs.parameters.one-small-output-int-Output}}", "text": "{{inputs.parameters.one-small-output-str-Output}}"}'}
+  - name: two-small-outputs
+    container:
+      args: ['----output-paths', /tmp/outputs/text/data, /tmp/outputs/number/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def two_small_outputs():
+            return ("two_output", 222)
+
+        def _serialize_int(int_value: int) -> str:
+            if isinstance(int_value, str):
+                return int_value
+            if not isinstance(int_value, int):
+                raise TypeError('Value "{}" has type "{}" instead of int.'.format(
+                    str(int_value), str(type(int_value))))
+            return str(int_value)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Two small outputs', description='')
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = two_small_outputs(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_int,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    outputs:
+      parameters:
+      - name: two-small-outputs-number
+        valueFrom: {path: /tmp/outputs/number/data}
+      - name: two-small-outputs-text
+        valueFrom: {path: /tmp/outputs/text/data}
+      artifacts:
+      - {name: two-small-outputs-number, path: /tmp/outputs/number/data}
+      - {name: two-small-outputs-text, path: /tmp/outputs/text/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["----output-paths", {"outputPath": "text"}, {"outputPath": "number"}],
+          "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" >
+          \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def two_small_outputs():\n    return
+          (\"two_output\", 222)\n\ndef _serialize_int(int_value: int) -> str:\n    if
+          isinstance(int_value, str):\n        return int_value\n    if not isinstance(int_value,
+          int):\n        raise TypeError(''Value \"{}\" has type \"{}\" instead of
+          int.''.format(\n            str(int_value), str(type(int_value))))\n    return
+          str(int_value)\n\ndef _serialize_str(str_value: str) -> str:\n    if not
+          isinstance(str_value, str):\n        raise TypeError(''Value \"{}\" has
+          type \"{}\" instead of str.''.format(\n            str(str_value), str(type(str_value))))\n    return
+          str_value\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Two
+          small outputs'', description='''')\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = two_small_outputs(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_int,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "name": "Two small outputs", "outputs": [{"name":
+          "text", "type": "String"}, {"name": "number", "type": "Integer"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner

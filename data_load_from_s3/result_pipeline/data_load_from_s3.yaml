@@ -1,0 +1,442 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: example-data-load-from-s3-and-train-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-15T17:59:39.672078',
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "example data load from s3 and
+      train"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13}
+spec:
+  entrypoint: example-data-load-from-s3-and-train
+  templates:
+  - name: checked-data-image-list
+    container:
+      args: [--pre-data, /tmp/inputs/pre_data/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def checked_data_image_list(
+                pre_data
+        ):
+            import os
+            file_list = os.listdir(pre_data)
+            dog_list = []
+            cat_list = []
+            for i, item in enumerate(file_list):
+                if 'cat' in item :
+                    dog_list.append(item)
+                elif 'dog' in item :
+                    cat_list.append(item)
+
+            print(f'train_dog_image_num : {len(dog_list)}')
+            print(f'train_cat_image_num : {len(cat_list)}')
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Checked data image list', description='')
+        _parser.add_argument("--pre-data", dest="pre_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = checked_data_image_list(**_parsed_args)
+      image: python:3.9
+    inputs:
+      artifacts:
+      - {name: train-data-load-from-s3-output_dataset_train_data, path: /tmp/inputs/pre_data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--pre-data", {"inputPath": "pre_data"}], "command": ["sh", "-ec",
+          "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def checked_data_image_list(\n        pre_data\n):\n    import
+          os\n    file_list = os.listdir(pre_data)\n    dog_list = []\n    cat_list
+          = []\n    for i, item in enumerate(file_list):\n        if ''cat'' in item
+          :\n            dog_list.append(item)\n        elif ''dog'' in item :\n            cat_list.append(item)\n\n    print(f''train_dog_image_num
+          : {len(dog_list)}'')\n    print(f''train_cat_image_num : {len(cat_list)}'')\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Checked data image list'',
+          description='''')\n_parser.add_argument(\"--pre-data\", dest=\"pre_data\",
+          type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = checked_data_image_list(**_parsed_args)\n"], "image": "python:3.9"}},
+          "inputs": [{"name": "pre_data", "type": "String"}], "name": "Checked data
+          image list"}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: data-generation
+    container:
+      args: [--pre-data, /tmp/inputs/pre_data/data, --train-data, /tmp/outputs/train_data/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'numpy' 'scikit-image' 'pandas' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+        -m pip install --quiet --no-warn-script-location 'numpy' 'scikit-image' 'pandas'
+        --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def data_generation(
+                pre_data,
+                train_data
+        ):
+            from skimage import io
+            from skimage.transform import resize
+            import numpy as np
+            import os
+            import pandas as pd
+            import pickle
+
+            file_list = os.listdir(pre_data)
+            train_list = []
+            label_list = []
+            for i, item in enumerate(file_list):
+                temp = f'{pre_data}/{item}'
+                img = io.imread(temp)
+                resize_img = resize(img,(224,224))
+                resize_img = np.array(resize_img)
+                train_list.append(resize_img)
+                if 'cat' in item :
+                    label_list.append([1,0])
+                elif 'dog' in item :
+                    label_list.append([0,1])
+
+            df = pd.DataFrame(columns=['image', 'label'])
+            for i, image in enumerate(train_list):
+                df.loc[i] = ({'image': image, 'label': label_list[i]})
+
+            with open(train_data, 'wb') as f:
+                pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Data generation', description='')
+        _parser.add_argument("--pre-data", dest="pre_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--train-data", dest="train_data", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = data_generation(**_parsed_args)
+      image: python:3.9
+    inputs:
+      artifacts:
+      - {name: train-data-load-from-s3-output_dataset_train_data, path: /tmp/inputs/pre_data/data}
+    outputs:
+      artifacts:
+      - {name: data-generation-train_data, path: /tmp/outputs/train_data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--pre-data", {"inputPath": "pre_data"}, "--train-data", {"outputPath":
+          "train_data"}], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''numpy'' ''scikit-image''
+          ''pandas'' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+          --no-warn-script-location ''numpy'' ''scikit-image'' ''pandas'' --user)
+          && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\"
+          > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef data_generation(\n        pre_data,\n        train_data\n):\n    from
+          skimage import io\n    from skimage.transform import resize\n    import
+          numpy as np\n    import os\n    import pandas as pd\n    import pickle\n\n    file_list
+          = os.listdir(pre_data)\n    train_list = []\n    label_list = []\n    for
+          i, item in enumerate(file_list):\n        temp = f''{pre_data}/{item}''\n        img
+          = io.imread(temp)\n        resize_img = resize(img,(224,224))\n        resize_img
+          = np.array(resize_img)\n        train_list.append(resize_img)\n        if
+          ''cat'' in item :\n            label_list.append([1,0])\n        elif ''dog''
+          in item :\n            label_list.append([0,1])\n\n    df = pd.DataFrame(columns=[''image'',
+          ''label''])\n    for i, image in enumerate(train_list):\n        df.loc[i]
+          = ({''image'': image, ''label'': label_list[i]})\n\n    with open(train_data,
+          ''wb'') as f:\n        pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Data generation'', description='''')\n_parser.add_argument(\"--pre-data\",
+          dest=\"pre_data\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train-data\",
+          dest=\"train_data\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = data_generation(**_parsed_args)\n"], "image": "python:3.9"}}, "inputs":
+          [{"name": "pre_data", "type": "String"}], "name": "Data generation", "outputs":
+          [{"name": "train_data", "type": "Dataset"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: example-data-load-from-s3-and-train
+    dag:
+      tasks:
+      - name: checked-data-image-list
+        template: checked-data-image-list
+        dependencies: [train-data-load-from-s3]
+        arguments:
+          artifacts:
+          - {name: train-data-load-from-s3-output_dataset_train_data, from: '{{tasks.train-data-load-from-s3.outputs.artifacts.train-data-load-from-s3-output_dataset_train_data}}'}
+      - name: data-generation
+        template: data-generation
+        dependencies: [train-data-load-from-s3]
+        arguments:
+          artifacts:
+          - {name: train-data-load-from-s3-output_dataset_train_data, from: '{{tasks.train-data-load-from-s3.outputs.artifacts.train-data-load-from-s3-output_dataset_train_data}}'}
+      - {name: model-generation, template: model-generation}
+      - {name: train-data-load-from-s3, template: train-data-load-from-s3}
+      - name: train-model
+        template: train-model
+        dependencies: [data-generation, model-generation]
+        arguments:
+          artifacts:
+          - {name: data-generation-train_data, from: '{{tasks.data-generation.outputs.artifacts.data-generation-train_data}}'}
+          - {name: model-generation-pretrain_model, from: '{{tasks.model-generation.outputs.artifacts.model-generation-pretrain_model}}'}
+  - name: model-generation
+    container:
+      args: [--pretrain-model, /tmp/outputs/pretrain_model/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def model_generation(
+                pretrain_model
+        ) :
+            from keras.applications import ResNet50
+            from keras.models import Sequential
+
+            model = Sequential()
+            model.add(ResNet50(include_top=True, weights=None, input_shape=(224, 224, 3), classes=2))
+            # model = ResNet50(include_top=True, weights='imagenet', input_shape=(224, 224, 3), pooling=max, classes=2)
+            model.compile(optimizer='adam',
+                          loss='binary_crossentropy',
+                          metrics=['accuracy'])
+
+            model.save(pretrain_model)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Model generation', description='')
+        _parser.add_argument("--pretrain-model", dest="pretrain_model", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = model_generation(**_parsed_args)
+      image: tensorflow/tensorflow
+    outputs:
+      artifacts:
+      - {name: model-generation-pretrain_model, path: /tmp/outputs/pretrain_model/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--pretrain-model", {"outputPath": "pretrain_model"}], "command":
+          ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef model_generation(\n        pretrain_model\n) :\n    from
+          keras.applications import ResNet50\n    from keras.models import Sequential\n\n    model
+          = Sequential()\n    model.add(ResNet50(include_top=True, weights=None, input_shape=(224,
+          224, 3), classes=2))\n    # model = ResNet50(include_top=True, weights=''imagenet'',
+          input_shape=(224, 224, 3), pooling=max, classes=2)\n    model.compile(optimizer=''adam'',\n                  loss=''binary_crossentropy'',\n                  metrics=[''accuracy''])\n\n    model.save(pretrain_model)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Model generation'', description='''')\n_parser.add_argument(\"--pretrain-model\",
+          dest=\"pretrain_model\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = model_generation(**_parsed_args)\n"], "image": "tensorflow/tensorflow"}},
+          "name": "Model generation", "outputs": [{"name": "pretrain_model", "type":
+          "TFModel"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: train-data-load-from-s3
+    container:
+      args: [--output-dataset-train-data, /tmp/outputs/output_dataset_train_data/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'boto3' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+        --no-warn-script-location 'boto3' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def train_data_load_from_s3(
+                output_dataset_train_data
+        ):
+            import boto3
+            import os
+            aws_access_key = 'AKIAREGH6H7HYBXUPU72'
+            aws_secret_access_key = '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'
+            bucket_name = 'mlperf-data'
+            bucket_dir_name = 'train'
+
+            s3r = boto3.resource('s3', aws_access_key_id=aws_access_key,
+                                 aws_secret_access_key=aws_secret_access_key)
+            bucket = s3r.Bucket(bucket_name)
+            s3 = boto3.client('s3', aws_access_key_id=aws_access_key,
+                              aws_secret_access_key=aws_secret_access_key)
+
+            count_dog = 0
+            count_cat = 0
+            # data_path = f'{output_dataset_train_data}/data'
+            os.makedirs(output_dataset_train_data)
+            for object in bucket.objects.filter(Prefix=bucket_dir_name):
+                if 'cat' in object.key :
+                    temp = f'{output_dataset_train_data}/cat_{count_cat}.jpg'
+                    s3.download_file(bucket_name, object.key, temp)
+                    count_cat += 1
+                elif 'dog' in object.key :
+                    temp = f'{output_dataset_train_data}/dog_{count_dog}.jpg'
+                    s3.download_file(bucket_name, object.key, temp)
+                    count_dog += 1
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Train data load from s3', description='')
+        _parser.add_argument("--output-dataset-train-data", dest="output_dataset_train_data", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = train_data_load_from_s3(**_parsed_args)
+      image: python:3.9
+    outputs:
+      artifacts:
+      - {name: train-data-load-from-s3-output_dataset_train_data, path: /tmp/outputs/output_dataset_train_data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--output-dataset-train-data", {"outputPath": "output_dataset_train_data"}],
+          "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+          install --quiet --no-warn-script-location ''boto3'' || PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''boto3'' --user)
+          && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\"
+          > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef train_data_load_from_s3(\n        output_dataset_train_data\n):\n    import
+          boto3\n    import os\n    aws_access_key = ''AKIAREGH6H7HYBXUPU72''\n    aws_secret_access_key
+          = ''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''\n    bucket_name = ''mlperf-data''\n    bucket_dir_name
+          = ''train''\n\n    s3r = boto3.resource(''s3'', aws_access_key_id=aws_access_key,\n                         aws_secret_access_key=aws_secret_access_key)\n    bucket
+          = s3r.Bucket(bucket_name)\n    s3 = boto3.client(''s3'', aws_access_key_id=aws_access_key,\n                      aws_secret_access_key=aws_secret_access_key)\n\n    count_dog
+          = 0\n    count_cat = 0\n    # data_path = f''{output_dataset_train_data}/data''\n    os.makedirs(output_dataset_train_data)\n    for
+          object in bucket.objects.filter(Prefix=bucket_dir_name):\n        if ''cat''
+          in object.key :\n            temp = f''{output_dataset_train_data}/cat_{count_cat}.jpg''\n            s3.download_file(bucket_name,
+          object.key, temp)\n            count_cat += 1\n        elif ''dog'' in object.key
+          :\n            temp = f''{output_dataset_train_data}/dog_{count_dog}.jpg''\n            s3.download_file(bucket_name,
+          object.key, temp)\n            count_dog += 1\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Train data load from s3'', description='''')\n_parser.add_argument(\"--output-dataset-train-data\",
+          dest=\"output_dataset_train_data\", type=_make_parent_dirs_and_return_path,
+          required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = train_data_load_from_s3(**_parsed_args)\n"], "image": "python:3.9"}},
+          "name": "Train data load from s3", "outputs": [{"name": "output_dataset_train_data",
+          "type": "String"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: train-model
+    container:
+      args: [--train-dataset, /tmp/inputs/train_dataset/data, --pre-model, /tmp/inputs/pre_model/data,
+        --trained-model, /tmp/outputs/trained_model/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas==1.4.2' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install
+        --quiet --no-warn-script-location 'pandas==1.4.2' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def train_model(
+                train_dataset,
+                pre_model,
+                trained_model
+        ) :
+            import pickle
+            from tensorflow import keras
+            import numpy as np
+            import pandas as pd
+
+            with open(train_dataset, 'rb') as file:
+                tr_data = pickle.load(file)
+
+            images = []
+            labels = []
+            for i, item in enumerate(tr_data['image']) :
+                images.append(item)
+                labels.append(tr_data['label'][i])
+
+            images = np.array(images)
+            labels = np.array(labels)
+            model = keras.models.load_model(pre_model)
+
+            model.fit(images, labels, epochs=20)
+            model.save(trained_model)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Train model', description='')
+        _parser.add_argument("--train-dataset", dest="train_dataset", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--pre-model", dest="pre_model", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--trained-model", dest="trained_model", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = train_model(**_parsed_args)
+      image: tensorflow/tensorflow
+    inputs:
+      artifacts:
+      - {name: model-generation-pretrain_model, path: /tmp/inputs/pre_model/data}
+      - {name: data-generation-train_data, path: /tmp/inputs/train_dataset/data}
+    outputs:
+      artifacts:
+      - {name: train-model-trained_model, path: /tmp/outputs/trained_model/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--train-dataset", {"inputPath": "train_dataset"}, "--pre-model",
+          {"inputPath": "pre_model"}, "--trained-model", {"outputPath": "trained_model"}],
+          "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+          install --quiet --no-warn-script-location ''pandas==1.4.2'' || PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''pandas==1.4.2''
+          --user) && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef train_model(\n        train_dataset,\n        pre_model,\n        trained_model\n)
+          :\n    import pickle\n    from tensorflow import keras\n    import numpy
+          as np\n    import pandas as pd\n\n    with open(train_dataset, ''rb'') as
+          file:\n        tr_data = pickle.load(file)\n\n    images = []\n    labels
+          = []\n    for i, item in enumerate(tr_data[''image'']) :\n        images.append(item)\n        labels.append(tr_data[''label''][i])\n\n    images
+          = np.array(images)\n    labels = np.array(labels)\n    model = keras.models.load_model(pre_model)\n\n    model.fit(images,
+          labels, epochs=20)\n    model.save(trained_model)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Train model'', description='''')\n_parser.add_argument(\"--train-dataset\",
+          dest=\"train_dataset\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--pre-model\",
+          dest=\"pre_model\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--trained-model\",
+          dest=\"trained_model\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = train_model(**_parsed_args)\n"], "image": "tensorflow/tensorflow"}}, "inputs":
+          [{"name": "train_dataset", "type": "Dataset"}, {"name": "pre_model", "type":
+          "TFModel"}], "name": "Train model", "outputs": [{"name": "trained_model",
+          "type": "TFModel"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner
