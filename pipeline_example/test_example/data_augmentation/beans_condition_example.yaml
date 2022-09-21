@@ -1,0 +1,410 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: tensorflow-beans-dataset-augmentation-pipeline-example-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-21T18:25:28.029321',
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "tensorflow beans dataset augmentation
+      pipeline example"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13}
+spec:
+  entrypoint: tensorflow-beans-dataset-augmentation-pipeline-example
+  templates:
+  - name: flip-left-right
+    container:
+      args: [--pre-data, /tmp/inputs/pre_data/data, --data, /tmp/outputs/data/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas==1.4.2' 'numpy' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+        install --quiet --no-warn-script-location 'pandas==1.4.2' 'numpy' --user)
+        && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def flip_left_right(
+                pre_data,
+                data
+        ):
+            import tensorflow as tf
+            import numpy as np
+            import pickle
+            import pandas as pd
+
+            images = []
+            labels = []
+            with open(pre_data, 'rb') as file:
+                tr_data = pickle.load(file)
+
+            for i, item in enumerate(tr_data['image']):
+                images.append(item)
+                labels.append(tr_data['label'][i])
+            images = np.array(images)
+            labels = np.array(labels)
+
+            new_image = []
+            new_label = []
+            for i, image in enumerate(images):
+                result = tf.image.flip_left_right(image)
+                new_image.append(result)
+                new_label.append(labels[i])
+
+            df = pd.DataFrame(columns=['image', 'label'])
+
+            for i, image in enumerate(new_image):
+                df.loc[i] = ({'image': image, 'label': new_label[i]})
+            with open(data, 'wb') as f:
+                pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Flip left right', description='')
+        _parser.add_argument("--pre-data", dest="pre_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--data", dest="data", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = flip_left_right(**_parsed_args)
+      image: tensorflow/tensorflow
+    inputs:
+      artifacts:
+      - {name: train-data-load-output_dataset_train_data, path: /tmp/inputs/pre_data/data}
+    outputs:
+      artifacts:
+      - {name: flip-left-right-data, path: /tmp/outputs/data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--pre-data", {"inputPath": "pre_data"}, "--data", {"outputPath":
+          "data"}], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+          -m pip install --quiet --no-warn-script-location ''pandas==1.4.2'' ''numpy''
+          || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+          ''pandas==1.4.2'' ''numpy'' --user) && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef flip_left_right(\n        pre_data,\n        data\n):\n    import
+          tensorflow as tf\n    import numpy as np\n    import pickle\n    import
+          pandas as pd\n\n    images = []\n    labels = []\n    with open(pre_data,
+          ''rb'') as file:\n        tr_data = pickle.load(file)\n\n    for i, item
+          in enumerate(tr_data[''image'']):\n        images.append(item)\n        labels.append(tr_data[''label''][i])\n    images
+          = np.array(images)\n    labels = np.array(labels)\n\n    new_image = []\n    new_label
+          = []\n    for i, image in enumerate(images):\n        result = tf.image.flip_left_right(image)\n        new_image.append(result)\n        new_label.append(labels[i])\n\n    df
+          = pd.DataFrame(columns=[''image'', ''label''])\n\n    for i, image in enumerate(new_image):\n        df.loc[i]
+          = ({''image'': image, ''label'': new_label[i]})\n    with open(data, ''wb'')
+          as f:\n        pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Flip left right'', description='''')\n_parser.add_argument(\"--pre-data\",
+          dest=\"pre_data\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--data\",
+          dest=\"data\", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = flip_left_right(**_parsed_args)\n"],
+          "image": "tensorflow/tensorflow"}}, "inputs": [{"name": "pre_data", "type":
+          "Dataset"}], "name": "Flip left right", "outputs": [{"name": "data", "type":
+          "Dataset"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: merge-data-generation
+    container:
+      args: [--origin-data, /tmp/inputs/origin_data/data, --re-data, /tmp/inputs/re_data/data,
+        --ho-data, /tmp/inputs/ho_data/data, --data, /tmp/outputs/data/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas==1.4.2' 'numpy' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+        install --quiet --no-warn-script-location 'pandas==1.4.2' 'numpy' --user)
+        && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def merge_data_generation(
+                origin_data,
+                re_data,
+                ho_data,
+                data
+        ):
+            import numpy as np
+            import pickle
+            import pandas as pd
+
+            with open(origin_data, 'rb') as file:
+                data_1 = pickle.load(file)
+            with open(re_data, 'rb') as file:
+                data_2 = pickle.load(file)
+            with open(ho_data, 'rb') as file:
+                data_3 = pickle.load(file)
+
+            result_temp = pd.concat([data_1,data_2], ignore_index=True)
+            result = pd.concat([result_temp,data_3], ignore_index=True)
+
+            with open(data, 'wb') as f:
+                pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Merge data generation', description='')
+        _parser.add_argument("--origin-data", dest="origin_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--re-data", dest="re_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--ho-data", dest="ho_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--data", dest="data", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = merge_data_generation(**_parsed_args)
+      image: tensorflow/tensorflow
+    inputs:
+      artifacts:
+      - {name: rotation-data, path: /tmp/inputs/ho_data/data}
+      - {name: train-data-load-output_dataset_train_data, path: /tmp/inputs/origin_data/data}
+      - {name: flip-left-right-data, path: /tmp/inputs/re_data/data}
+    outputs:
+      artifacts:
+      - {name: merge-data-generation-data, path: /tmp/outputs/data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--origin-data", {"inputPath": "origin_data"}, "--re-data", {"inputPath":
+          "re_data"}, "--ho-data", {"inputPath": "ho_data"}, "--data", {"outputPath":
+          "data"}], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+          -m pip install --quiet --no-warn-script-location ''pandas==1.4.2'' ''numpy''
+          || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+          ''pandas==1.4.2'' ''numpy'' --user) && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef merge_data_generation(\n        origin_data,\n        re_data,\n        ho_data,\n        data\n):\n    import
+          numpy as np\n    import pickle\n    import pandas as pd\n\n    with open(origin_data,
+          ''rb'') as file:\n        data_1 = pickle.load(file)\n    with open(re_data,
+          ''rb'') as file:\n        data_2 = pickle.load(file)\n    with open(ho_data,
+          ''rb'') as file:\n        data_3 = pickle.load(file)\n\n    result_temp
+          = pd.concat([data_1,data_2], ignore_index=True)\n    result = pd.concat([result_temp,data_3],
+          ignore_index=True)\n\n    with open(data, ''wb'') as f:\n        pickle.dump(result,
+          f, pickle.HIGHEST_PROTOCOL)\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Merge
+          data generation'', description='''')\n_parser.add_argument(\"--origin-data\",
+          dest=\"origin_data\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--re-data\",
+          dest=\"re_data\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--ho-data\",
+          dest=\"ho_data\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--data\",
+          dest=\"data\", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = merge_data_generation(**_parsed_args)\n"],
+          "image": "tensorflow/tensorflow"}}, "inputs": [{"name": "origin_data", "type":
+          "Dataset"}, {"name": "re_data", "type": "Dataset"}, {"name": "ho_data",
+          "type": "Dataset"}], "name": "Merge data generation", "outputs": [{"name":
+          "data", "type": "Dataset"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: rotation
+    container:
+      args: [--pre-data, /tmp/inputs/pre_data/data, --data, /tmp/outputs/data/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas==1.4.2' 'numpy' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+        install --quiet --no-warn-script-location 'pandas==1.4.2' 'numpy' --user)
+        && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def rotation(
+                pre_data,
+                data
+        ):
+            import tensorflow as tf
+            import numpy as np
+            import pickle
+            import pandas as pd
+
+            images = []
+            labels = []
+            with open(pre_data, 'rb') as file:
+                tr_data = pickle.load(file)
+
+            for i, item in enumerate(tr_data['image']):
+                images.append(item)
+                labels.append(tr_data['label'][i])
+            images = np.array(images)
+            labels = np.array(labels)
+
+            new_image = []
+            new_label = []
+            for i, image in enumerate(images):
+                result = tf.image.rot90(image)
+                new_image.append(result)
+                new_label.append(labels[i])
+
+            df = pd.DataFrame(columns=['image', 'label'])
+
+            for i, image in enumerate(new_image):
+                df.loc[i] = ({'image': image, 'label': new_label[i]})
+            with open(data, 'wb') as f:
+                pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Rotation', description='')
+        _parser.add_argument("--pre-data", dest="pre_data", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--data", dest="data", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = rotation(**_parsed_args)
+      image: tensorflow/tensorflow
+    inputs:
+      artifacts:
+      - {name: train-data-load-output_dataset_train_data, path: /tmp/inputs/pre_data/data}
+    outputs:
+      artifacts:
+      - {name: rotation-data, path: /tmp/outputs/data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--pre-data", {"inputPath": "pre_data"}, "--data", {"outputPath":
+          "data"}], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+          -m pip install --quiet --no-warn-script-location ''pandas==1.4.2'' ''numpy''
+          || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+          ''pandas==1.4.2'' ''numpy'' --user) && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef rotation(\n        pre_data,\n        data\n):\n    import
+          tensorflow as tf\n    import numpy as np\n    import pickle\n    import
+          pandas as pd\n\n    images = []\n    labels = []\n    with open(pre_data,
+          ''rb'') as file:\n        tr_data = pickle.load(file)\n\n    for i, item
+          in enumerate(tr_data[''image'']):\n        images.append(item)\n        labels.append(tr_data[''label''][i])\n    images
+          = np.array(images)\n    labels = np.array(labels)\n\n    new_image = []\n    new_label
+          = []\n    for i, image in enumerate(images):\n        result = tf.image.rot90(image)\n        new_image.append(result)\n        new_label.append(labels[i])\n\n    df
+          = pd.DataFrame(columns=[''image'', ''label''])\n\n    for i, image in enumerate(new_image):\n        df.loc[i]
+          = ({''image'': image, ''label'': new_label[i]})\n    with open(data, ''wb'')
+          as f:\n        pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Rotation'', description='''')\n_parser.add_argument(\"--pre-data\",
+          dest=\"pre_data\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--data\",
+          dest=\"data\", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = rotation(**_parsed_args)\n"],
+          "image": "tensorflow/tensorflow"}}, "inputs": [{"name": "pre_data", "type":
+          "Dataset"}], "name": "Rotation", "outputs": [{"name": "data", "type": "Dataset"}]}',
+        pipelines.kubeflow.org/component_ref: '{}'}
+  - name: tensorflow-beans-dataset-augmentation-pipeline-example
+    dag:
+      tasks:
+      - name: flip-left-right
+        template: flip-left-right
+        dependencies: [train-data-load]
+        arguments:
+          artifacts:
+          - {name: train-data-load-output_dataset_train_data, from: '{{tasks.train-data-load.outputs.artifacts.train-data-load-output_dataset_train_data}}'}
+      - name: merge-data-generation
+        template: merge-data-generation
+        dependencies: [flip-left-right, rotation, train-data-load]
+        arguments:
+          artifacts:
+          - {name: flip-left-right-data, from: '{{tasks.flip-left-right.outputs.artifacts.flip-left-right-data}}'}
+          - {name: rotation-data, from: '{{tasks.rotation.outputs.artifacts.rotation-data}}'}
+          - {name: train-data-load-output_dataset_train_data, from: '{{tasks.train-data-load.outputs.artifacts.train-data-load-output_dataset_train_data}}'}
+      - name: rotation
+        template: rotation
+        dependencies: [train-data-load]
+        arguments:
+          artifacts:
+          - {name: train-data-load-output_dataset_train_data, from: '{{tasks.train-data-load.outputs.artifacts.train-data-load-output_dataset_train_data}}'}
+      - {name: train-data-load, template: train-data-load}
+  - name: train-data-load
+    container:
+      args: [--output-dataset-train-data, /tmp/outputs/output_dataset_train_data/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas==1.4.2' 'tensorflow-datasets' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+        -m pip install --quiet --no-warn-script-location 'pandas==1.4.2' 'tensorflow-datasets'
+        --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def train_data_load(
+                output_dataset_train_data
+        ):
+            import tensorflow as tf
+            import pandas as pd
+            import pickle
+            import tensorflow_datasets as tfds
+
+            ds, ds_info = tfds.load('beans', split='train', shuffle_files=True, with_info=True)
+
+            df = pd.DataFrame(columns=['image', 'label'])
+            for i, image in enumerate(ds):
+                df.loc[i] = ({'image': image['image'], 'label': image['label']})
+
+            with open(output_dataset_train_data, 'wb') as f:
+                pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Train data load', description='')
+        _parser.add_argument("--output-dataset-train-data", dest="output_dataset_train_data", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = train_data_load(**_parsed_args)
+      image: tensorflow/tensorflow
+    outputs:
+      artifacts:
+      - {name: train-data-load-output_dataset_train_data, path: /tmp/outputs/output_dataset_train_data/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--output-dataset-train-data", {"outputPath": "output_dataset_train_data"}],
+          "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+          install --quiet --no-warn-script-location ''pandas==1.4.2'' ''tensorflow-datasets''
+          || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+          ''pandas==1.4.2'' ''tensorflow-datasets'' --user) && \"$0\" \"$@\"", "sh",
+          "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef train_data_load(\n        output_dataset_train_data\n):\n    import
+          tensorflow as tf\n    import pandas as pd\n    import pickle\n    import
+          tensorflow_datasets as tfds\n\n    ds, ds_info = tfds.load(''beans'', split=''train'',
+          shuffle_files=True, with_info=True)\n\n    df = pd.DataFrame(columns=[''image'',
+          ''label''])\n    for i, image in enumerate(ds):\n        df.loc[i] = ({''image'':
+          image[''image''], ''label'': image[''label'']})\n\n    with open(output_dataset_train_data,
+          ''wb'') as f:\n        pickle.dump(df, f, pickle.HIGHEST_PROTOCOL)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Train data load'', description='''')\n_parser.add_argument(\"--output-dataset-train-data\",
+          dest=\"output_dataset_train_data\", type=_make_parent_dirs_and_return_path,
+          required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = train_data_load(**_parsed_args)\n"], "image": "tensorflow/tensorflow"}},
+          "name": "Train data load", "outputs": [{"name": "output_dataset_train_data",
+          "type": "Dataset"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner

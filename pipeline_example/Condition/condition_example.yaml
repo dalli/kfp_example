@@ -1,0 +1,707 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: connect-example-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13, pipelines.kubeflow.org/pipeline_compilation_time: '2022-09-21T13:37:24.929968',
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "Connect example pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.13}
+spec:
+  entrypoint: connect-example-pipeline
+  templates:
+  - name: condition-1
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    dag:
+      tasks:
+      - name: node-c-plus
+        template: node-c-plus
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{inputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{inputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{inputs.parameters.node-b-workflow}}'}
+  - name: condition-2
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    dag:
+      tasks:
+      - name: node-d-minus
+        template: node-d-minus
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{inputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{inputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{inputs.parameters.node-b-workflow}}'}
+  - name: condition-3
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    dag:
+      tasks:
+      - name: node-e-multiply
+        template: node-e-multiply
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{inputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{inputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{inputs.parameters.node-b-workflow}}'}
+  - name: condition-4
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    dag:
+      tasks:
+      - name: node-f-division
+        template: node-f-division
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{inputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{inputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{inputs.parameters.node-b-workflow}}'}
+  - name: connect-example-pipeline
+    dag:
+      tasks:
+      - name: condition-1
+        template: condition-1
+        when: '"{{tasks.node-b.outputs.parameters.node-b-cal}}" == "plus"'
+        dependencies: [node-a, node-b]
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{tasks.node-a.outputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{tasks.node-a.outputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{tasks.node-b.outputs.parameters.node-b-workflow}}'}
+      - name: condition-2
+        template: condition-2
+        when: '"{{tasks.node-b.outputs.parameters.node-b-cal}}" == "minus"'
+        dependencies: [node-a, node-b]
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{tasks.node-a.outputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{tasks.node-a.outputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{tasks.node-b.outputs.parameters.node-b-workflow}}'}
+      - name: condition-3
+        template: condition-3
+        when: '"{{tasks.node-b.outputs.parameters.node-b-cal}}" == "multiply"'
+        dependencies: [node-a, node-b]
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{tasks.node-a.outputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{tasks.node-a.outputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{tasks.node-b.outputs.parameters.node-b-workflow}}'}
+      - name: condition-4
+        template: condition-4
+        when: '"{{tasks.node-b.outputs.parameters.node-b-cal}}" == "division"'
+        dependencies: [node-a, node-b]
+        arguments:
+          parameters:
+          - {name: node-a-number, value: '{{tasks.node-a.outputs.parameters.node-a-number}}'}
+          - {name: node-a-workflow, value: '{{tasks.node-a.outputs.parameters.node-a-workflow}}'}
+          - {name: node-b-workflow, value: '{{tasks.node-b.outputs.parameters.node-b-workflow}}'}
+      - {name: node-a, template: node-a}
+      - {name: node-b, template: node-b}
+  - name: node-a
+    container:
+      args: ['----output-paths', /tmp/outputs/workflow/data, /tmp/outputs/number/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def node_A():
+            task_A = 'A'
+            import random
+            number1 = random.randint(1,10)
+            number2 = random.randint(1,10)
+
+            return (task_A, [number1, number2])
+
+        def _serialize_json(obj) -> str:
+            if isinstance(obj, str):
+                return obj
+            import json
+
+            def default_serializer(obj):
+                if hasattr(obj, 'to_struct'):
+                    return obj.to_struct()
+                else:
+                    raise TypeError(
+                        "Object of type '%s' is not JSON serializable and does not have .to_struct() method."
+                        % obj.__class__.__name__)
+
+            return json.dumps(obj, default=default_serializer, sort_keys=True)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Node A', description='')
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = node_A(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_json,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    outputs:
+      parameters:
+      - name: node-a-number
+        valueFrom: {path: /tmp/outputs/number/data}
+      - name: node-a-workflow
+        valueFrom: {path: /tmp/outputs/workflow/data}
+      artifacts:
+      - {name: node-a-number, path: /tmp/outputs/number/data}
+      - {name: node-a-workflow, path: /tmp/outputs/workflow/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["----output-paths", {"outputPath": "workflow"}, {"outputPath":
+          "number"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\"
+          \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def
+          node_A():\n    task_A = ''A''\n    import random\n    number1 = random.randint(1,10)\n    number2
+          = random.randint(1,10)\n\n    return (task_A, [number1, number2])\n\ndef
+          _serialize_json(obj) -> str:\n    if isinstance(obj, str):\n        return
+          obj\n    import json\n\n    def default_serializer(obj):\n        if hasattr(obj,
+          ''to_struct''):\n            return obj.to_struct()\n        else:\n            raise
+          TypeError(\n                \"Object of type ''%s'' is not JSON serializable
+          and does not have .to_struct() method.\"\n                % obj.__class__.__name__)\n\n    return
+          json.dumps(obj, default=default_serializer, sort_keys=True)\n\ndef _serialize_str(str_value:
+          str) -> str:\n    if not isinstance(str_value, str):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of str.''.format(\n            str(str_value),
+          str(type(str_value))))\n    return str_value\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Node A'', description='''')\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = node_A(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_json,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "name": "Node A", "outputs": [{"name": "workflow",
+          "type": "String"}, {"name": "number", "type": "JsonArray"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: node-b
+    container:
+      args: ['----output-paths', /tmp/outputs/workflow/data, /tmp/outputs/cal/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def node_B() :
+            task_B = 'B'
+            import random
+            calculator_list = ['plus', 'minus', 'multiply', 'division']
+            cal = calculator_list[random.randint(0,3)]
+            return (task_B, cal)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Node B', description='')
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = node_B(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_str,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    outputs:
+      parameters:
+      - name: node-b-cal
+        valueFrom: {path: /tmp/outputs/cal/data}
+      - name: node-b-workflow
+        valueFrom: {path: /tmp/outputs/workflow/data}
+      artifacts:
+      - {name: node-b-cal, path: /tmp/outputs/cal/data}
+      - {name: node-b-workflow, path: /tmp/outputs/workflow/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["----output-paths", {"outputPath": "workflow"}, {"outputPath":
+          "cal"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\"
+          \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def
+          node_B() :\n    task_B = ''B''\n    import random\n    calculator_list =
+          [''plus'', ''minus'', ''multiply'', ''division'']\n    cal = calculator_list[random.randint(0,3)]\n    return
+          (task_B, cal)\n\ndef _serialize_str(str_value: str) -> str:\n    if not
+          isinstance(str_value, str):\n        raise TypeError(''Value \"{}\" has
+          type \"{}\" instead of str.''.format(\n            str(str_value), str(type(str_value))))\n    return
+          str_value\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Node
+          B'', description='''')\n_parser.add_argument(\"----output-paths\", dest=\"_output_paths\",
+          type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = node_B(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_str,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "name": "Node B", "outputs": [{"name": "workflow",
+          "type": "String"}, {"name": "cal", "type": "String"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: node-c-plus
+    container:
+      args: [--number, '{{inputs.parameters.node-a-number}}', --C1, '{{inputs.parameters.node-a-workflow}}',
+        --C2, '{{inputs.parameters.node-b-workflow}}', '----output-paths', /tmp/outputs/workflow/data,
+        /tmp/outputs/result/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def node_C_plus(number, C1, C2) :
+            task_C = f'{(C1, C2)} -> C_plus'
+            print(task_C)
+            result = sum(number)
+            # result = int(number[0]) + int(number[1])
+            return (task_C, result)
+
+        def _serialize_float(float_value: float) -> str:
+            if isinstance(float_value, str):
+                return float_value
+            if not isinstance(float_value, (float, int)):
+                raise TypeError('Value "{}" has type "{}" instead of float.'.format(
+                    str(float_value), str(type(float_value))))
+            return str(float_value)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import json
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Node C plus', description='')
+        _parser.add_argument("--number", dest="number", type=json.loads, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--C1", dest="C1", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--C2", dest="C2", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = node_C_plus(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_float,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    outputs:
+      artifacts:
+      - {name: node-c-plus-result, path: /tmp/outputs/result/data}
+      - {name: node-c-plus-workflow, path: /tmp/outputs/workflow/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--number", {"inputValue": "number"}, "--C1", {"inputValue": "C1"},
+          "--C2", {"inputValue": "C2"}, "----output-paths", {"outputPath": "workflow"},
+          {"outputPath": "result"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def node_C_plus(number, C1, C2) :\n    task_C = f''{(C1, C2)} -> C_plus''\n    print(task_C)\n    result
+          = sum(number)\n    # result = int(number[0]) + int(number[1])\n    return
+          (task_C, result)\n\ndef _serialize_float(float_value: float) -> str:\n    if
+          isinstance(float_value, str):\n        return float_value\n    if not isinstance(float_value,
+          (float, int)):\n        raise TypeError(''Value \"{}\" has type \"{}\" instead
+          of float.''.format(\n            str(float_value), str(type(float_value))))\n    return
+          str(float_value)\n\ndef _serialize_str(str_value: str) -> str:\n    if not
+          isinstance(str_value, str):\n        raise TypeError(''Value \"{}\" has
+          type \"{}\" instead of str.''.format(\n            str(str_value), str(type(str_value))))\n    return
+          str_value\n\nimport json\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Node
+          C plus'', description='''')\n_parser.add_argument(\"--number\", dest=\"number\",
+          type=json.loads, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--C1\",
+          dest=\"C1\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--C2\",
+          dest=\"C2\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = node_C_plus(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_float,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "number", "type": "JsonArray"},
+          {"name": "C1", "type": "String"}, {"name": "C2", "type": "String"}], "name":
+          "Node C plus", "outputs": [{"name": "workflow", "type": "String"}, {"name":
+          "result", "type": "Float"}]}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"C1": "{{inputs.parameters.node-a-workflow}}",
+          "C2": "{{inputs.parameters.node-b-workflow}}", "number": "{{inputs.parameters.node-a-number}}"}'}
+  - name: node-d-minus
+    container:
+      args: [--number, '{{inputs.parameters.node-a-number}}', --D1, '{{inputs.parameters.node-a-workflow}}',
+        --D2, '{{inputs.parameters.node-b-workflow}}', '----output-paths', /tmp/outputs/workflow/data,
+        /tmp/outputs/result/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def node_D_minus(number, D1, D2) :
+            task_D = f'{(D1, D2)} -> D_minus'
+            print(task_D)
+            result = int(number[0]) - int(number[1])
+            return (task_D, result)
+
+        def _serialize_float(float_value: float) -> str:
+            if isinstance(float_value, str):
+                return float_value
+            if not isinstance(float_value, (float, int)):
+                raise TypeError('Value "{}" has type "{}" instead of float.'.format(
+                    str(float_value), str(type(float_value))))
+            return str(float_value)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import json
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Node D minus', description='')
+        _parser.add_argument("--number", dest="number", type=json.loads, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--D1", dest="D1", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--D2", dest="D2", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = node_D_minus(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_float,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    outputs:
+      artifacts:
+      - {name: node-d-minus-result, path: /tmp/outputs/result/data}
+      - {name: node-d-minus-workflow, path: /tmp/outputs/workflow/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--number", {"inputValue": "number"}, "--D1", {"inputValue": "D1"},
+          "--D2", {"inputValue": "D2"}, "----output-paths", {"outputPath": "workflow"},
+          {"outputPath": "result"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def node_D_minus(number, D1, D2) :\n    task_D = f''{(D1, D2)} -> D_minus''\n    print(task_D)\n    result
+          = int(number[0]) - int(number[1])\n    return (task_D, result)\n\ndef _serialize_float(float_value:
+          float) -> str:\n    if isinstance(float_value, str):\n        return float_value\n    if
+          not isinstance(float_value, (float, int)):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of float.''.format(\n            str(float_value),
+          str(type(float_value))))\n    return str(float_value)\n\ndef _serialize_str(str_value:
+          str) -> str:\n    if not isinstance(str_value, str):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of str.''.format(\n            str(str_value),
+          str(type(str_value))))\n    return str_value\n\nimport json\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Node D minus'', description='''')\n_parser.add_argument(\"--number\",
+          dest=\"number\", type=json.loads, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--D1\",
+          dest=\"D1\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--D2\",
+          dest=\"D2\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = node_D_minus(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_float,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "number", "type": "JsonArray"},
+          {"name": "D1", "type": "String"}, {"name": "D2", "type": "String"}], "name":
+          "Node D minus", "outputs": [{"name": "workflow", "type": "String"}, {"name":
+          "result", "type": "Float"}]}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"D1": "{{inputs.parameters.node-a-workflow}}",
+          "D2": "{{inputs.parameters.node-b-workflow}}", "number": "{{inputs.parameters.node-a-number}}"}'}
+  - name: node-e-multiply
+    container:
+      args: [--number, '{{inputs.parameters.node-a-number}}', --E1, '{{inputs.parameters.node-a-workflow}}',
+        --E2, '{{inputs.parameters.node-b-workflow}}', '----output-paths', /tmp/outputs/workflow/data,
+        /tmp/outputs/result/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def node_E_multiply(number, E1, E2):
+            task_E = f'{(E1, E2)} -> E_multiply'
+            print(task_E)
+            result = int(number[0]) * int(number[1])
+            return (task_E, result)
+
+        def _serialize_float(float_value: float) -> str:
+            if isinstance(float_value, str):
+                return float_value
+            if not isinstance(float_value, (float, int)):
+                raise TypeError('Value "{}" has type "{}" instead of float.'.format(
+                    str(float_value), str(type(float_value))))
+            return str(float_value)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import json
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Node E multiply', description='')
+        _parser.add_argument("--number", dest="number", type=json.loads, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--E1", dest="E1", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--E2", dest="E2", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = node_E_multiply(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_float,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    outputs:
+      artifacts:
+      - {name: node-e-multiply-result, path: /tmp/outputs/result/data}
+      - {name: node-e-multiply-workflow, path: /tmp/outputs/workflow/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--number", {"inputValue": "number"}, "--E1", {"inputValue": "E1"},
+          "--E2", {"inputValue": "E2"}, "----output-paths", {"outputPath": "workflow"},
+          {"outputPath": "result"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def node_E_multiply(number, E1, E2):\n    task_E = f''{(E1, E2)} -> E_multiply''\n    print(task_E)\n    result
+          = int(number[0]) * int(number[1])\n    return (task_E, result)\n\ndef _serialize_float(float_value:
+          float) -> str:\n    if isinstance(float_value, str):\n        return float_value\n    if
+          not isinstance(float_value, (float, int)):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of float.''.format(\n            str(float_value),
+          str(type(float_value))))\n    return str(float_value)\n\ndef _serialize_str(str_value:
+          str) -> str:\n    if not isinstance(str_value, str):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of str.''.format(\n            str(str_value),
+          str(type(str_value))))\n    return str_value\n\nimport json\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Node E multiply'', description='''')\n_parser.add_argument(\"--number\",
+          dest=\"number\", type=json.loads, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--E1\",
+          dest=\"E1\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--E2\",
+          dest=\"E2\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = node_E_multiply(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_float,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "number", "type": "JsonArray"},
+          {"name": "E1", "type": "String"}, {"name": "E2", "type": "String"}], "name":
+          "Node E multiply", "outputs": [{"name": "workflow", "type": "String"}, {"name":
+          "result", "type": "Float"}]}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"E1": "{{inputs.parameters.node-a-workflow}}",
+          "E2": "{{inputs.parameters.node-b-workflow}}", "number": "{{inputs.parameters.node-a-number}}"}'}
+  - name: node-f-division
+    container:
+      args: [--number, '{{inputs.parameters.node-a-number}}', --F1, '{{inputs.parameters.node-a-workflow}}',
+        --F2, '{{inputs.parameters.node-b-workflow}}', '----output-paths', /tmp/outputs/workflow/data,
+        /tmp/outputs/result/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def node_F_division(number, F1, F2):
+            task_F = f'{(F1, F2)} -> F_division'
+            print(task_F)
+            result = int(number[0]) / int(number[1])
+            return (task_F, result)
+
+        def _serialize_float(float_value: float) -> str:
+            if isinstance(float_value, str):
+                return float_value
+            if not isinstance(float_value, (float, int)):
+                raise TypeError('Value "{}" has type "{}" instead of float.'.format(
+                    str(float_value), str(type(float_value))))
+            return str(float_value)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import json
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Node F division', description='')
+        _parser.add_argument("--number", dest="number", type=json.loads, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--F1", dest="F1", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--F2", dest="F2", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = node_F_division(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_float,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    inputs:
+      parameters:
+      - {name: node-a-number}
+      - {name: node-a-workflow}
+      - {name: node-b-workflow}
+    outputs:
+      artifacts:
+      - {name: node-f-division-result, path: /tmp/outputs/result/data}
+      - {name: node-f-division-workflow, path: /tmp/outputs/workflow/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.13
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--number", {"inputValue": "number"}, "--F1", {"inputValue": "F1"},
+          "--F2", {"inputValue": "F2"}, "----output-paths", {"outputPath": "workflow"},
+          {"outputPath": "result"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def node_F_division(number, F1, F2):\n    task_F = f''{(F1, F2)} -> F_division''\n    print(task_F)\n    result
+          = int(number[0]) / int(number[1])\n    return (task_F, result)\n\ndef _serialize_float(float_value:
+          float) -> str:\n    if isinstance(float_value, str):\n        return float_value\n    if
+          not isinstance(float_value, (float, int)):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of float.''.format(\n            str(float_value),
+          str(type(float_value))))\n    return str(float_value)\n\ndef _serialize_str(str_value:
+          str) -> str:\n    if not isinstance(str_value, str):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of str.''.format(\n            str(str_value),
+          str(type(str_value))))\n    return str_value\n\nimport json\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Node F division'', description='''')\n_parser.add_argument(\"--number\",
+          dest=\"number\", type=json.loads, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--F1\",
+          dest=\"F1\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--F2\",
+          dest=\"F2\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = node_F_division(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_float,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "inputs": [{"name": "number", "type": "JsonArray"},
+          {"name": "F1", "type": "String"}, {"name": "F2", "type": "String"}], "name":
+          "Node F division", "outputs": [{"name": "workflow", "type": "String"}, {"name":
+          "result", "type": "Float"}]}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"F1": "{{inputs.parameters.node-a-workflow}}",
+          "F2": "{{inputs.parameters.node-b-workflow}}", "number": "{{inputs.parameters.node-a-number}}"}'}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner
