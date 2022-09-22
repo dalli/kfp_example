@@ -20,7 +20,7 @@
 ## 코드 설명
 
 * `pipeline_example.ipynb` 파이프라인을 구성하는 기본 노드(컴포넌트)들을 정의하는 방법을 확인할 수 있습니다.
-* `DAG_example.ipynb` 파이프라인을 작성하기 위해 노드의 입력과 출력을 연결하는 방법을 다음 그림을 단계별로 구현하면서 확인할 수 있습니다.   
+* `DAG_example.ipynb` 아래 그림 DAG 구조를 가지는 파이프라인을 구현합니다.
 <img src='node_image/pipeline_example.png' width="450px"></img>   
 
 ### DAG_example 예제
